@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { query } = require("express");
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 const app = express();
@@ -9,7 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (res, req) => {
+app.get("/", (req, res) => {
   res.send("Ema john app is running");
 });
 
@@ -25,9 +26,42 @@ const client = new MongoClient(uri, {
   useUnifiedTopology: true,
   serverApi: ServerApiVersion.v1,
 });
-client.connect((err) => {
-  const collection = client.db("test").collection("devices");
-  // perform actions on the collection object
-  console.log("Db connect");
-  client.close();
-});
+
+const run = async () => {
+  try {
+    const productCollection = client
+      .db("emaJohnShopping")
+      .collection("products");
+
+    app.get("/products", async (req, res) => {
+      const currPage = parseInt(req.query.page);
+      const pageSize = parseInt(req.query.size);
+      console.log(currPage, pageSize);
+
+      const query = {};
+
+      const cursor = productCollection.find(query);
+      const products = await cursor
+        .skip(currPage * pageSize)
+        .limit(pageSize)
+        .toArray();
+
+      //counter
+      const count = await productCollection.estimatedDocumentCount();
+      res.send({ count, products });
+    });
+
+    app.post("/productsByIds", async (req, res) => {
+      const Ids = req.body;
+      const ObjectIds = Ids.map((id) => ObjectId(id));
+      const query = { _id: { $in: ObjectIds } };
+      const cursor = productCollection.find(query);
+
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+  } finally {
+  }
+};
+
+run().catch(console.dir);
